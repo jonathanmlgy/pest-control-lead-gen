@@ -1,0 +1,458 @@
+{
+  "name": "Pest Control Lead Scraper",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "139be386-8947-4cca-87ea-cb9b3b6cb654",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2336,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/microworlds~crawler-google-places/run-sync-get-dataset-items?token=YOUR_APIFY_API_TOKEN",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"keywords\": [\n    \"restaurants Amadeo Cavite\",\n    \"warehouses Amadeo Cavite\"\n  ],\n  \"location\": \"Amadeo, Cavite, Philippines\",\n  \"max_result_per_keyword\": 2,\n  \"scrape_contacts\": true,\n  \"scrape_categories\": true\n}",
+        "options": {}
+      },
+      "id": "9ef027e7-de96-435a-9f26-5095d3003769",
+      "name": "Start Apify Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -2128,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=={{ 'Qualify this business as a pest control lead:\\n\\nBusiness Name: ' + ($('Loop Over Items').item.json.title || 'N/A') + '\\nCategory: ' + ($('Loop Over Items').item.json.category || 'N/A') + '\\nAddress: ' + ($('Loop Over Items').item.json.address || 'N/A') + '\\nPhone: ' + ($('Loop Over Items').item.json.phone || 'N/A') + '\\nRating: ' + ($('Loop Over Items').item.json.total_score || 'N/A') + '\\nReviews: ' + ($('Loop Over Items').item.json.reviews_count || 'N/A') + '\\nWebsite: ' + ($('Loop Over Items').item.json.website || 'N/A') + '\\nEmail: ' + ($('Loop Over Items').item.json.email || 'N/A') }}",
+        "options": {
+          "systemMessage": "You are a lead qualification assistant for a pest control business in the Philippines.\n\nDetermine category from the business name:\n- If name contains \"restaurant\", \"cafe\", \"fast food\", \"eatery\" → category = restaurant\n- If name contains \"office\", \"corporate\" → category = office\n- If name contains \"warehouse\", \"storage\" → category = warehouse\n- Otherwise → category = other\n\nGive the lead a score using these rules:\n- Score 8-10 (hot): restaurants, food businesses, warehouses, hotels, schools, hospitals\n- Score 5-7 (warm): offices, retail stores, commercial buildings\n- Score 1-4 (cold): sari-sari stores, solo practitioners, residential, online-only\n\nGive additional score if:\n- Has a phone number (+2 points)\n- Has 10+ reviews (+1 point)\n- Rating above 4.0 (+1 point)\n- Has a website (+1 point)\n\nCategory must be one of: restaurant, warehouse, office, hotel, school, hospital, retail, other\nStatus must be exactly: \"hot\", \"warm\", or \"cold\"\n\nReturn ONLY this JSON format, nothing else:\n{\"score\": 7, \"reason\": \"One sentence reason here\", \"status\": \"warm\", \"category\": \"restaurant\"}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1408,
+        -16
+      ],
+      "id": "a519cbc6-605d-4143-b0ef-8d37b85523a8",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=={{ $workflow.id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1312,
+        208
+      ],
+      "id": "cae64f8f-108b-42d7-974e-1b65e5d9819b",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1968,
+        -16
+      ],
+      "id": "9e9aff1d-2ffe-48b7-92ad-febac8671c97",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        208
+      ],
+      "id": "89d10a5e-8977-4e02-8b95-327872c9825e",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "YOUR_GROQ_API_KEY",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "82e6ffed-9bff-4258-9e84-321d91c12730",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1616,
+        -16
+      ],
+      "id": "9ff6d66b-26b4-4d3c-b8c6-89a1dafc9c18",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "try {\n  const output = $json.output;\n  \n  // Clean and parse JSON from agent output\n  const cleaned = output.replace(/```json|```/g, '').trim();\n  const parsed = JSON.parse(cleaned);\n  \n  return [\n    {\n      json: {\n        business_name: $('Loop Over Items').item.json.title,\n        address: $('Loop Over Items').item.json.address,\n        phone: $('Loop Over Items').item.json.phone,\n        website: $('Loop Over Items').item.json.website,\n        rating: Number($('Loop Over Items').item.json.total_score || 0),\n        reviews_count: Number($('Loop Over Items').item.json.reviews_count || 0),\n        ai_score: Number(parsed.score),\n        ai_reason: parsed.reason,\n        status: parsed.status,\n        category: parsed.category,\n        search_text: `${$('Loop Over Items').item.json.title} is a ${parsed.category} located in ${$('Loop Over Items').item.json.city || $('Loop Over Items').item.json.state || ''}. This business has ${$('Loop Over Items').item.json.reviews_count || 0} reviews and a rating of ${$('Loop Over Items').item.json.total_score || 'unrated'}. As a ${parsed.category}, this establishment ${\n          parsed.category === 'restaurant' ? 'handles food and has high hygiene requirements' : \n          parsed.category === 'warehouse' ? 'stores goods and needs rodent control' : \n          parsed.category === 'office' ? 'has many employees and needs clean workspace' : \n          'requires pest control services'\n        }. Lead status: ${parsed.status}. AI qualification reason: ${parsed.reason || ''}`\n      }\n    }\n  ];\n\n} catch(error) {\n  // Fallback — don't crash the workflow\n  const lead = $('Loop Over Items').item.json;\n  return [\n    {\n      json: {\n        business_name: lead.title || 'Unknown Business',\n        address: lead.address || '',\n        phone: lead.phone || '',\n        website: lead.website || '',\n        rating: Number(lead.total_score || 0),\n        reviews_count: Number(lead.reviews_count || 0),\n        ai_score: 0,\n        ai_reason: 'Parse error: ' + error.message,\n        status: 'error',\n        category: 'unknown',\n        search_text: `${lead.title || 'Unknown'} is a business requiring pest control services located in ${lead.city || lead.state || 'Philippines'}`\n      }\n    }\n  ];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1104,
+        -16
+      ],
+      "id": "5b1d8aec-9fcb-4207-886a-0ebc4e9f1e85",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "tableId": "leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "business_name",
+              "fieldValue": "={{ $json.business_name }}"
+            },
+            {
+              "fieldId": "address",
+              "fieldValue": "={{ $json.address }}"
+            },
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $json.phone }}"
+            },
+            {
+              "fieldId": "website",
+              "fieldValue": "={{ $json.website }}"
+            },
+            {
+              "fieldId": "rating",
+              "fieldValue": "={{ $json.rating }}"
+            },
+            {
+              "fieldId": "reviews_count",
+              "fieldValue": "={{ $json.reviews_count }}"
+            },
+            {
+              "fieldId": "ai_score",
+              "fieldValue": "={{ $json.ai_score }}"
+            },
+            {
+              "fieldId": "ai_reason",
+              "fieldValue": "={{ $json.ai_reason }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.category }}"
+            },
+            {
+              "fieldId": "search_text",
+              "fieldValue": "={{ $json.search_text }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        -16
+      ],
+      "id": "b42f4be0-7538-4a47-8f49-93c4bd5d382d",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_URL",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "business_name",
+              "keyValue": "={{ $json.title }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1760,
+        -16
+      ],
+      "id": "91dfecc6-0da7-4c47-9230-333b67936b4a",
+      "name": "Get a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_URL",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=YOUR_GEMINI_API_KEY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"models/gemini-embedding-001\",\n  \"outputDimensionality\": 1536,\n  \"content\": {\n    \"parts\": [\n      {\n        \"text\": \"{{ $json.search_text }}\"\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -784,
+        -16
+      ],
+      "id": "ed4f6029-08f8-47bd-9c18-977bfbaf6277",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create a row').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "embedding",
+              "fieldValue": "={{ $json.embedding.values }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        -16
+      ],
+      "id": "39946a09-be7a-4cb0-9529-3a616640aa65",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_URL",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Start Apify Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Apify Scraper": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a row": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2ccc4978-d2ce-4384-9f06-7d72f1437259",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c07fab829cd5ee80237a150d8fe0e67064a837c6ab2f80cd556c9de10e8e753"
+  },
+  "id": "LKtn4mCha7McpUfX",
+  "tags": []
+}
