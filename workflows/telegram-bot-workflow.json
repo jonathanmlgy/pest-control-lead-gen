@@ -1,0 +1,284 @@
+{
+  "name": "Telegram query",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -256,
+        0
+      ],
+      "id": "42225fcf-20a2-4ca3-afc3-15a6934406c0",
+      "name": "Telegram Trigger",
+      "webhookId": "269c4335-db16-4754-9f9a-b374fe2f6063",
+      "credentials": {
+        "telegramApi": {
+          "id": "S7pWpX8JFT9NsoLs",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=GEMINI_KEY",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"models/gemini-embedding-001\",\n  \"outputDimensionality\": 1536,\n  \"content\": {\n    \"parts\": [{\n      \"text\": \"={{ $json.message.text }}\"\n    }]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        48,
+        0
+      ],
+      "id": "4e9fb855-610c-4cc2-ad6f-79a075228e6c",
+      "name": "Message embedding"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        688,
+        192
+      ],
+      "id": "cca62dac-f389-44b6-b409-6773da8da421",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "vk9qSPvM1evlGXQD",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=={{ 'User asked: ' + $('Telegram Trigger').item.json.message.text + '\\n\\nHere are the relevant leads found:\\n' + JSON.stringify($json) }}",
+        "options": {
+          "systemMessage": "You are a You are a helpful assistant for a pest control business owner in the Philippines.\n\nYou will receive a query from the business owner and a list of relevant leads from the database.\n\nYour job is to:\n1. Read the leads provided\n2. Format them into a clean, readable response\n3. Only include the most relevant information: business name, address, phone, score, status\n4. Be conversational and helpful\n5. If no leads are found, say \"No matching leads found for your query\"\n\nIMPORTANT FILTERING RULES:\n- If the user asks for leads with score below X, only show leads where score < X\n- If the user asks for hot leads, only show leads where status = \"hot\"\n- If the user asks for uncontacted leads, only show leads where status = \"uncontacted\"\n- If the user asks for leads in a specific location, only show leads matching that location\n- NEVER show leads that don't match the user's filter criteria\n- If no leads match the filter, say \"No leads found matching your criteria\"\n\nFormat each lead like this:\n🏢 Business Name\n📍 Address\n📞 Phone\n⭐ Score: X/10\n🔥 Status: hot/warm/cold\n\nKeep your response concise and easy to read on mobile.helpful assistant"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        640,
+        0
+      ],
+      "id": "33963dd9-802f-44da-8a40-d53b371d7ae3",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        0
+      ],
+      "id": "7b7a4356-7203-4c88-925b-4f5accc829fa",
+      "name": "Send a text message",
+      "webhookId": "cd5f6028-572b-4877-8a89-621a99e07a87",
+      "credentials": {
+        "telegramApi": {
+          "id": "S7pWpX8JFT9NsoLs",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://awkenervwjtchvhdecwa.supabase.co/rest/v1/rpc/match_leads",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_URL"
+            },
+            {
+              "name": "Authorization",
+              "value": "YOUR_SUPABASE_URL"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query_embedding\": {{ JSON.stringify($json.embedding.values) }},\n  \"match_threshold\": 0.5,\n  \"match_count\": 5\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        288,
+        0
+      ],
+      "id": "fec8c8cc-3bd4-41d8-ab7f-cadec94969af",
+      "name": "Supabase vector search"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "da527bf7-389d-4cee-b1ff-15308070ab97",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        496,
+        0
+      ],
+      "id": "d59d7092-4981-40a9-91fa-3b2d2b716fd7",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "😕 No leads found matching your query. Try searching for: - \"Find restaurants in Cavite\" - \"Show me warehouses\" - \"Find food businesses in Tagaytay\"",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        176
+      ],
+      "id": "22064256-2b07-4b18-9b9c-f3bfac985bfe",
+      "name": "Send a text message1",
+      "webhookId": "b29f066c-e202-4afa-9696-105c78b72a82",
+      "credentials": {
+        "telegramApi": {
+          "id": "S7pWpX8JFT9NsoLs",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Message embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message embedding": {
+      "main": [
+        [
+          {
+            "node": "Supabase vector search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase vector search": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2c65a441-8d8a-4fda-8133-dba772c778c7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3c07fab829cd5ee80237a150d8fe0e67064a837c6ab2f80cd556c9de10e8e753"
+  },
+  "id": "Jc8M7RcecjDho3Y6",
+  "tags": []
+}
